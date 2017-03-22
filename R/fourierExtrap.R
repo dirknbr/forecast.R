@@ -1,5 +1,5 @@
 
-# translation https://gist.github.com/tartakynov/83f3cd8f44208a1856ce into R
+# translation of https://gist.github.com/tartakynov/83f3cd8f44208a1856ce into R
 
 fftfreq <- function(n, d = 1.0) {
   if (n %% 2 == 0) {
