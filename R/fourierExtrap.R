@@ -1,7 +1,10 @@
 
+
 # translation of https://gist.github.com/tartakynov/83f3cd8f44208a1856ce into R
 
 fftfreq <- function(n, d = 1.0) {
+  # fft frequencies, same as in numpy
+  stopifnot(n %% 1 == 0) # is int
   if (n %% 2 == 0) {
     f <- c(0:(n / 2 - 1), - (n / 2):(- 1)) / (d * n)
   } else {
@@ -10,7 +13,11 @@ fftfreq <- function(n, d = 1.0) {
   return(f)
 }
 
-fourierExtrap <- function(x, n_predict, n_harm = 10) {
+fourierExtrap <- function(x, n_predict, n_harm = 8) {
+  # Args:
+  #  x: vector
+  #  n_predict: forecast horizon
+
   n <- length(x)
   t <- 0:(n - 1)
   p <- lm(x ~ t)
@@ -36,4 +43,14 @@ x <- c(669, 592, 664, 1005, 699, 401, 646, 472, 598, 681, 1126, 1260, 562, 491, 
 n_predict <- 100
 extrap <- fourierExtrap(x, n_predict)
 matplot(cbind(c(x, rep(NA, n_predict)), extrap), type = 'l')
+
+# sensitivity to n_harm
+train <- 1:270
+n_predict <- 18
+for (nh in 2:20) {
+  p <- fourierExtrap(x[train], n_predict, nh)
+  cat(nh, mape(x[-train], tail(p, n_predict)), '\n')
+}
+
+# 1, 5, 8, 17 are local minima
 
