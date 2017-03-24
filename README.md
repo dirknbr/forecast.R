@@ -10,4 +10,4 @@ It introduces four Bayesian models in stan
 3. Local linear trend
 4. Weight model (eg it can model 13 weights on 13 X variables and 10 time steps which is not possible in frequentist setup)
 
-Note that most code has tests around the functions. You need to load all scripts to get the `ForecastEns()` to run.
+Note that most code has tests around the functions. You need to load all scripts to get the `forecastEns()` to run.
