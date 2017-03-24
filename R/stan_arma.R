@@ -1,9 +1,9 @@
 
 # stan arma
 library(rstan)
-stan_arma <- stan_model('arma.stan')
-stan_arma_w <- stan_model('arma_weight.stan')
-stan_llt <- stan_model('llt.stan')
+stan_arma <- stan_model('stan/arma.stan')
+stan_arma_w <- stan_model('stan/arma_weight.stan')
+stan_llt <- stan_model('stan/llt.stan')
 
 # test with simulated ARMA(2, 1)
 set.seed(3)

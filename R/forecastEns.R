@@ -114,7 +114,7 @@ forecastEns <- function(y, train, test, iter = 800, chains = 3, plot = T) {
     	k <- ncol(x)
     
 		if (i == 1) {
-			cpp <- stan_model('weight.stan')
+			cpp <- stan_model('stan/weight.stan')
 			datal <- list(N = h, y = y[test], k = ncol(x), x = x)
 			fit <- sampling(cpp, data = datal, chains = chains, iter = iter)
 			print(fit)
