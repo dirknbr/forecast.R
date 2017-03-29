@@ -1,0 +1,70 @@
+
+# More granular change points 
+
+The `changepoint` library seems to find only very few change points in mean, so here I show an extension which slices the time series and then walks trough it finding more local change points.
+
+```{r}
+iter_cpt <- function(x, step = 100) {
+  # function to find multiple mean change points using cpt by slicing the data
+  # Args:
+  #  x: vector
+  #  step: integer step size
+  # Returns:
+  #  vector of points
+  n <- length(x)
+  stopifnot(step < n)
+  a <- 1
+  b <- step
+  points <- c()
+  while (b < n) {
+    cp <- cpt.mean(x[a:b])
+    p <- cp@cpts[1] + (a - 1)
+    if (p %in% points) {
+      a <- a + step
+    } else {
+      points <- c(points, p)
+      a <- p
+    }
+    b <- min(n, a + step)
+    cat(a, b, p, '\n')
+  }
+  return(points)
+}
+
+plot_iter_cpt <- function(x, points) {
+  # plot changing mean given many change points
+  # Args:
+  #  x: vector
+  #  points: vector of integer points
+  
+  stopifnot(max(points) <= length(x))
+  means <- c()
+  a <- 1
+  points <- c(points, length(x))
+  for (b in points) {
+    m <- mean(x[a:b])
+    cat(a, b, m, '\n')
+    means <- c(means, rep(m, b - a + 1))
+    a <- b + 1
+  }
+  matplot(cbind(x, means), type = 'l', ylab = 'x and mean')
+}
+
+library(changepoint)
+library(quantmod)
+
+# test with some simulated data
+x <- c(rnorm(90, 10, 1), rnorm(90, 12, 1), rnorm(90, 14, 1))
+points <- iter_cpt(x, 100)
+plot_iter_cpt(x, points)
+
+getSymbols('AAPL')
+plot(AAPL)
+x2 <- as.data.frame(AAPL)[, 4]
+
+# use cpt.mean on total series
+plot(cpt.mean(x2))
+
+points2 <- iter_cpt(x2, 300)
+plot_iter_cpt(x2, points2)
+```
