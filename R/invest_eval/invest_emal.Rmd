@@ -1,0 +1,163 @@
+
+# Investment evaluation as measure of forecast success
+
+We want to see whether certain forecasts perform better than random ones in making an investment decision on stocks. 
+
+First we define 2 functions which invest when we predict a rise and calculate the winnings.
+
+```{r}
+library(forecast)
+
+invest_eval <- function(last, pred, actual) {
+  # if forecast > last invest, calc the return (sell next period)
+  if (pred > last) {
+  	return(actual - last)
+  } else {
+  	return(0)
+  }
+}
+
+wins <- function(x, p, idx) {
+  stopifnot(max(idx) <= length(x))
+  w <- sapply(idx, function(i) {
+    invest_eval(x[i - 1], p[i], x[i])
+  })
+  return(w)
+}
+
+set.seed(100)
+n <- 100
+
+# 2 uncorrelated random series
+xrand <- rnorm(n, 10, 1)
+prand <- rnorm(n, 10, 1)
+cor(xrand, prand)
+
+# 2 uncorrelated trended series
+xtrend <- 1:n / 5 + rnorm(n, 0, 1)
+ptrend <- 1:n / 5 + rnorm(n, 0, 1)
+cor(xtrend, ptrend)
+
+# 2 process with same structure but not related
+xar1 <- 10 + arima.sim(list(ar = .8), n)
+par1 <- 10 + arima.sim(list(ar = .8), n)
+cor(xar1, par1)
+
+# auto.arima forecast
+par1f <- sapply(11:n, function(i) {
+  # 1:10 -> 11
+  forecast(auto.arima(xar1[1:(i - 1)]), 1)$mean
+})
+par1f <- c(rep(NA, 10), par1f)
+
+# theta forecast
+par1f2 <- sapply(11:n, function(i) {
+  # 1:10 -> 11
+  thetaf(xar1[1:(i - 1)], 1)$mean
+})
+par1f2 <- c(rep(NA, 10), par1f2)
+
+# naive oppose the sign 
+par1f3 <- sapply(11:n, function(i) {
+  # oppose the last change
+  xar1[i - 1] - sign(xar1[i - 1] - xar1[i - 2])
+})
+par1f3 <- c(rep(NA, 10), par1f3)
+
+cor(xar1, par1, use = 'compl')
+cor(xar1, par1f, use = 'compl')
+cor(xar1, par1f2, use = 'compl')
+cor(xar1, par1f3, use = 'compl')
+
+# calc wins
+wrand <- wins(xrand, prand, 11:n)
+wtrend <- wins(xtrend, ptrend, 11:n)
+war1 <- wins(xar1, par1, 11:n)
+war1f <- wins(xar1, par1f, 11:n)
+war1f2 <- wins(xar1, par1f2, 11:n)
+war1f3 <- wins(xar1, par1f3, 11:n)
+
+matplot(cbind(xrand, prand), type = 'l', main = 'random')
+matplot(cbind(xtrend, ptrend), type = 'l', main = 'trend')
+matplot(cbind(xar1, par1, par1f, par1f2, par1f3), type = 'l', main = 'AR1')
+legend('bottomleft', c('ar1', 'random', 'auto.arima', 'thetaf', 'opp sign'), lty = 1, col = 1:5)
+
+# plot cum wins
+plot(cumsum(wrand), type = 'l')
+plot(cumsum(wtrend), type = 'l')
+matplot(cbind(cumsum(war1), cumsum(war1f), cumsum(war1f2), cumsum(war1f3)), type = 'l')
+legend('bottomleft', c('random', 'auto.arima', 'thetaf', 'opp sign'), lty = 1, col = 1:4)
+
+# sum wins
+sum(wrand)
+sum(wtrend)
+sum(war1)
+sum(war1f)
+sum(war1f2)
+sum(war1f3)
+
+# what is structure of random and trended series
+summary(auto.arima(xrand))
+summary(auto.arima(xtrend))
+```
+
+Note that all series have mean of 10, so wins are kind of comparable. Using uncorrelated data for random and trended data, gives positive returns.
+
+For an AR(1) the random process gives the best returns, 3 forecast methods give worse returns. 
+
+```{r}
+# now try with real data
+
+library(quantmod)
+set.seed(100)
+getSymbols('DIS')
+plot(DIS)
+x2 <- as.data.frame(DIS)[1:n, 4]
+
+summary(auto.arima(x2))
+
+# a unrelated process with same structure
+parma11 <- mean(x2) + arima.sim(list(order = c(1, 1, 1), ar = .59, ma = -.84), n, sd = sd(x2))[1:n]
+matplot(cbind(x2, parma11), type = 'l')
+legend('bottomleft', c('DIS', 'ARIMA(1,1,1)'), lty = 1, col = 1:2)
+
+px2f <- sapply(11:n, function(i) {
+  # 1:10 -> 11
+  forecast(auto.arima(x2[1:(i - 1)]), 1)$mean
+})
+px2f <- c(rep(NA, 10), px2f)
+
+px2f2 <- sapply(11:n, function(i) {
+  # 1:10 -> 11
+  thetaf(x2[1:(i - 1)], 1)$mean
+})
+px2f2 <- c(rep(NA, 10), px2f2)
+
+px2f3 <- sapply(11:n, function(i) {
+  # oppose the last change
+  x2[i - 1] - sign(x2[i - 1] - x2[i - 2])
+})
+px2f3 <- c(rep(NA, 10), px2f3)
+
+cor(x2, parma11, use = 'compl')
+cor(x2, px2f, use = 'compl')
+cor(x2, px2f2, use = 'compl')
+cor(x2, px2f3, use = 'compl')
+
+matplot(cbind(x2, parma11, px2f, px2f2, px2f3), type = 'l')
+legend('bottomleft', c('actual', 'random', 'auto.arima', 'thetaf', 'opp sign'), lty = 1, col = 1:5)
+
+wx2 <- wins(x2, parma11, 11:n)
+wx2f <- wins(x2, px2f, 11:n)
+wx2f2 <- wins(x2, px2f2, 11:n)
+wx2f3 <- wins(x2, px2f3, 11:n)
+
+matplot(cbind(cumsum(wx2), cumsum(wx2f), cumsum(wx2f2), cumsum(wx2f3)), type = 'l')
+legend('bottomleft', c('random', 'auto.arima', 'thetaf', 'opp sign'), lty = 1, col = 1:4)
+sum(wx2)
+sum(wx2f)
+sum(wx2f2)
+sum(wx2f3)
+```
+
+The random process and the Arima forecast have positive returns. Sign forecast has negative returns. 
