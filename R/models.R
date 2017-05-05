@@ -21,27 +21,34 @@ trendForecast <- function(x, h = 1) {
 x <- 1:10 + rnorm(10, 0, .1)
 trendForecast(x, 2)
 
-movAvg <- function(x, m = 2) {
+movAvg <- function(x, m = 2, weight = F, plot = F) {
   # average of the last m including current
   # x[i] = mean(x[i], x[i - 1]) for m = 2
   # Args:
   #  x: vector
   #  m: integer parameter
+  #  weight: T for weight last most
   n <- length(x)
   stopifnot(m < n)
-  x2 <- rep(NA, n)
-  for (i in m:n) {
-    x2[i] <- mean(x[(i - m + 1):i])
+  if (weight) {
+    w <- m:1
+    w <- w / sum(w)
+  } else {
+    w <- rep(1 / m, m)
   }
+  x2 <- filter(x, w, sides = 1)
+  if (plot) matplot(cbind(x, x2), type = 'l')
   return(x2)
 }
 
 # test and compare with ma()
 movAvg(x, 3)
-ma(x, 3)
+movAvg(x, 3, weight = T)
+ma(x, 3, centre = F)
 
-movAvg(x, 4)
-ma(x, 4)
+movAvg(x, 4, plot = T)
+movAvg(x, 4, weight = T)
+ma(x, 4, centre = F)
 
 
 extrapolate <- function(x, h = 1) {
@@ -58,13 +65,14 @@ extrapolate <- function(x, h = 1) {
   return(x2[(n + 1):(n + h)])
 }
 
-maForecast <- function(x, h = 1, m = 3, method = 'last') {
+maForecast <- function(x, h = 1, m = 3, method = 'last', weight = F) {
   # Args:
   #  x: vector
   #  h: forecast horizon
   #  m: MA parameter (int)
   #  method: last or extrapolate
-  ma1 <- movAvg(x, m)
+  #  weight: T for weight last most 
+  ma1 <- movAvg(x, m, weight)
   n <- length(x)
   if (method == 'last') {
     return(rep(ma1[n], h))
@@ -73,7 +81,53 @@ maForecast <- function(x, h = 1, m = 3, method = 'last') {
   }
 }
 
+maForecastOptim <- function(x, h = 1, m = 1:20, fun = maForecast) {
+  # grid search to find best parameters
+  # Args:
+  #  x: vector
+  #  h: forecast horizon
+  #  m: MA parameter (int)
+  #  fun: which forecast function
+  best <- Inf
+  p <- list()
+  n <- length(x)
+  x2 <- x[1:(n - h)]
+  for (weight in c(T, F)) {
+    for (meth in c('last', 'extrap')) {
+      for (mi in m) {
+        f <- fun(x2, h, mi, meth, weight)
+        err <- mape(tail(x, h), f)
+        if (err < best) {
+          best <- err
+          p <- list(m = mi, method = meth, weight = weight)
+        }
+      }
+    }
+  }
+  f2 <- fun(x, h, p$m, p$method, p$weight)
+  cat(best, p$m, p$method, p$weight, '\n')
+  return(f2)
+}
+
+maDiffForecast <- function(x, h = 1, m = 20, method = 'last', weight = F) {
+  # use mov avg forecast and add ARMA modeled diff (x - movavg)
+  # Args:
+  #  x: vector
+  #  h: forecast horizon
+  #  m: MA parameter (int)
+  #  method: last or extrapolate
+  #  weight: T for weight last most 
+  ma <- movAvg(x, m, weight)
+  d <- x - ma
+  aa <- auto.arima(d)
+  faa <- forecast(aa, h)$mean
+  return(maForecast(x, h, m, method, weight) + faa)
+}
+
 # test
 extrapolate(x, 2)
 maForecast(x, 2)
 maForecast(x, 2, method = 'extrap')
+maDiffForecast(1:100 + rnorm(100, 0, .1), 10)
+maForecastOptim(x, 2, m = 1:3)
+maForecastOptim(x, 2, m = 1:3, fun = maDiffForecast)

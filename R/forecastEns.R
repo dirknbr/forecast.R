@@ -47,9 +47,10 @@ plotPred <- function(act, pred, ahead = F, main = '') {
 plotPred(1:10, 11:12)
 plotPred(1:10, 11:12, ahead = T)
 
+# stan_weight <- stan_model('stan/weight.stan')
 
 forecastEns <- function(y, train, test, iter = 800, chains = 3, plot = T) {
-	# function to create 13 different forecasts
+	# function to create 12 different forecasts
 	# then build a model of weighted forecasts
 	# retrain the forecasts and predict out of sample
 	# Args:
@@ -89,9 +90,9 @@ forecastEns <- function(y, train, test, iter = 800, chains = 3, plot = T) {
 
 		pex <- extrapolate(y[per], h)
 
-		pma1 <- maForecast(y[per], h)
+		pma1 <- maForecastOptim(y[per], h, fun = maForecast)
 
-		pma2 <- maForecast(y[per], h, method = 'ex')
+		pma2 <- maForecastOptim(y[per], h, fun = maDiffForecast)
 		
 		pfe <- tail(fourierExtrap(y[per], h), h)
 		
@@ -109,16 +110,19 @@ forecastEns <- function(y, train, test, iter = 800, chains = 3, plot = T) {
 		fitllt <- sampling(stan_llt, data = list(y = y[per], T = max(per), h = h), iter = iter, chains = chains)
 		pllt <- apply(extract(fitllt)$yhat, 2, mean)
 		
+		fitlstar <- sampling(lstar_stan, data = list(y = y[per], T = max(per), h = h, d = 1), iter = iter, chains = chains)
+		plstar <- tail(apply(extract(fitlstar)$yhat, 2, mean), h)
+		
+		fithmm <- sampling(hmmar1, data = list(y = y[per], T = max(per), h = h, K = 3), iter = iter, chains = chains)
+		phmm <- tail(apply(extract(fithmm)$yhat, 2, mean), h)
+		
 		x <- as.matrix(cbind(paa$mean, pet$mean, pth$mean, pbs$mean, ptr, pex, pma1, pma2, pfe, paa2, 
-		                     paa3, paa4, pllt))
-    	k <- ncol(x)
+		                     paa3, paa4, pllt, plstar, phmm))
+    k <- ncol(x)
     
 		if (i == 1) {
-			cpp <- stan_model('stan/weight.stan')
-			datal <- list(N = h, y = y[test], k = ncol(x), x = x)
-			fit <- sampling(cpp, data = datal, chains = chains, iter = iter)
-			print(fit)
-			beta <- apply(extract(fit)$beta, 2, mean)
+			beta <- weight_opt(y[test], x)
+			cat('weights', beta, '\n')
 			cat('in sample test\n')
 		} else {
 		  cat('out of sample\n')
@@ -128,29 +132,21 @@ forecastEns <- function(y, train, test, iter = 800, chains = 3, plot = T) {
 		yp <- x %*% beta
 		act <- y[(max(per) + 1):(max(per) + h)]
 		
-		if (plot) {
-		  plotPred(y[per], paa$mean, ahead = T, main = '1. auto.arima')
-		  plotPred(y[per], pet$mean, ahead = T, main = '2. ets')
-		  plotPred(y[per], pth$mean, ahead = T, main = '3. theta')
-		  plotPred(y[per], pbs$mean, ahead = T, main = '4. bsts')
-		  plotPred(y[per], ptr, ahead = T, main = '5. trend')
-		  plotPred(y[per], pex, ahead = T, main = '6. extrapolate')
-		  plotPred(y[per], pma1, ahead = T, main = '7. MA')
-		  plotPred(y[per], pma2, ahead = T, main = '8. MA extrap')
-		  plotPred(y[per], pfe, ahead = T, main = '9. fourier')
-		  plotPred(y[per], paa2, ahead = T, main = '10. auto.arima2')
-		  plotPred(y[per], paa3, ahead = T, main = '11. ARMA(2,1) bayes')
-		  plotPred(y[per], paa4, ahead = T, main = '12. ARMA(2,1) bayes weighted')
-		  plotPred(y[per], paa4, ahead = T, main = '13. Local linear trend')
-		  # matplot(cbind(act, yp), type = 'l')
-		  plotPred(y[per], yp, ahead = T, main = 'Ensembled forecast')
-		}
-		
-		mapes <-sapply(1:k, function(i) mape(act, x[, i]))
+		desc <- c('1. auto.arima', '2. ets', '3. theta', '4. bsts', '5. trend',
+			'6. extrapolate', '7. MA optim', '8. MA Diff optim', '9. fourier',
+			'10. auto.arima2', '11. ARMA(2, 1) bayes', '12. ARMA(2, 1) bayes weighted',
+			'13. Local linear trend', '14. LSTAR', '15. HMM AR(1)', 'Ensembled forecast')
+		x2 <- cbind(x, yp)
+		if (i == 2 & plot) {
+		  for (j in 1:(k + 1)) {
+		    plotPred(y[per], x2[, j], ahead = T, main = desc[j])
+		  }
+		}		
+		mapes <- sapply(1:(k + 1), function(i) mape(act, x2[, i]))
 		print(cbind(mapes, rank(mapes)))
-		print(mape(act, yp))
 	}
-	return(yp)
+	ret <- list(x = x2, mape = mapes, desc = desc)
+	return(ret)
 }
 
 

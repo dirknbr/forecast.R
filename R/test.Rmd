@@ -1,0 +1,47 @@
+
+# Forecast ensemble
+
+Test on financial data
+
+```{r}
+library(quantmod)
+source('weight_opt.R')
+source('forecastEns.R')
+source('fourierExtrap.R')
+source('stan_arma.R')
+source('models.R')
+source('auto_arima.R')
+source('setar.R')
+source('hmmar1_v3.R')
+
+# test on some daily share data
+
+n <- 220 # 5 days a week 50 weeks per year
+h <- 10
+train <- 1:(n - 2 * h)
+test <- (max(train) + 1):(n - h)
+hor <- (max(test) + 1):n
+stocks <- c('TGT', 'WMT', 'DIS', 'KO')
+res <- list()
+
+
+for (s in stocks) {
+  cat(s, '\n')
+	# gs <- getSymbols(s, auto.assign = F)
+  load(paste0(s, '.Rdata'))
+	plot(gs)
+	df <- as.data.frame(gs)
+	y <- df[, 1]
+	# visualise with moving avg and fourier
+	matplot(cbind(y[train], movAvg(y[train], 10)), type = 'l')
+	matplot(cbind(c(y[train], rep(NA, 10)), fourierExtrap(y[train], 10)), type = 'l')
+
+	res[[s]] <- forecastEns(y, train, test)
+}
+
+ranks <- sapply(1:4, function(i) rank(res[[i]]$mape))
+cbind(res[[1]]$desc, ranks)
+```
+
+We see that in 3 out of 4 cases the ensemble forecast comes out in the top 2 in the hold out data.
+Fourier comes out well too (with ranks 1, 2 and 4).

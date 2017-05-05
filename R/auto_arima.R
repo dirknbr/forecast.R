@@ -45,24 +45,24 @@ auto.arima2 <- function(x, h1 = 1, h2 = 1, pq.max = 4) {
   return(fm3)
 }
 
-# simulate some data and test it
-set.seed(16)
-ord <- c(2, 1, 1)
-x <- 200 + arima.sim(list(order = ord, ar = c(.7, -.4), ma = .3), 100)
-plot(x)
-train <- 1:90
-test <- 91:100
-h <- length(test)
-aa <- auto.arima(x[train], trace = T)
-summary(aa)
-
-m <- Arima(x[train], order = ord)
-summary(m)
-
-faa <- forecast(aa, h)$mean
-fm <- forecast(m, h)$mean
-fm3 <- auto.arima2(x[train], 3, h)
-
-mape(x[test], faa)
-mape(x[test], fm)
-mape(x[test], fm3)
+# # simulate some data and test it
+# set.seed(16)
+# ord <- c(2, 1, 1)
+# x <- 200 + arima.sim(list(order = ord, ar = c(.7, -.4), ma = .3), 100)
+# plot(x)
+# train <- 1:90
+# test <- 91:100
+# h <- length(test)
+# aa <- auto.arima(x[train], trace = T)
+# summary(aa)
+# 
+# m <- Arima(x[train], order = ord)
+# summary(m)
+# 
+# faa <- forecast(aa, h)$mean
+# fm <- forecast(m, h)$mean
+# fm3 <- auto.arima2(x[train], 3, h)
+# 
+# mape(x[test], faa)
+# mape(x[test], fm)
+# mape(x[test], fm3)
